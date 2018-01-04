@@ -11,6 +11,12 @@
 #define MAXIMUM_ARRAY_DATA        2
 #define ASCII_MIN_NUMBER          47
 #define ASCII_MAX_NUMBER          58
+
+/*
+ * Function declaration
+ */
+void processData(char);
+
 /*
  * Struct declarations
  */
@@ -85,58 +91,67 @@ void main(void) {
 #pragma vector=USCIAB0RX_VECTOR
     __interrupt void USCI0RX_ISR(void)
     {
-        // Local variable declarations
-        static char buff_rx;
-        static int pwm_val;
+        static char buff;
 
         while (!(IFG2&UCA0TXIFG));                // USCI_A0 TX buffer ready?
-        buff_rx = UCA0RXBUF;
+        buff = UCA0RXBUF;
+        processData(buff);
+    }
 
-        // Verify if we have to process data or save data
-        // To process data we have to receive '\n'
-        if(buff_rx != '\n')
+/* Function name: processData(char)
+ * Developer:     Raul Castañon
+ * Details:       Function used to process incoming data
+ */
+void processData(char buff_rx)
+{
+    // Local variable declarations
+    static int pwm_val;
+
+    // Verify if we have to process data or save data
+    // To process data we have to receive '\n'
+    if(buff_rx != '\n')
+    {
+        // Validate incoming data
+        if((MAXIMUM_ARRAY_DATA > input_data.data_count) &&
+                (ASCII_MIN_NUMBER < buff_rx) && (ASCII_MAX_NUMBER > buff_rx))
         {
-            // Validate incoming data
-            if((MAXIMUM_ARRAY_DATA > input_data.data_count) &&
-                    (ASCII_MIN_NUMBER < buff_rx) && (ASCII_MAX_NUMBER > buff_rx))
-            {
-                // Add data to array
-                input_data.data_input[input_data.data_count] = buff_rx;
-                // Increment count from data received
-                input_data.data_count++;
-            }
-            else
-            {
-                // Clean variables
-                input_data.data_count = 0;
-                memset(input_data.data_input, '\0', sizeof(input_data.data_input));
-            }
+            // Add data to array
+            input_data.data_input[input_data.data_count] = buff_rx;
+            // Increment count from data received
+            input_data.data_count++;
         }
         else
         {
-            // Validate count and data
-            if((MAXIMUM_ARRAY_DATA >= input_data.data_count) && ('\0' != input_data.data_input[0]))
-            {
-                // Convert received data (duty cycle) in timer counts
-                pwm_val = (int)((atoi(input_data.data_input))*128)/100;
-                // Check limits
-                if(pwm_val < MINIMUM_RATE)
-                {
-                    pwm_val = MINIMUM_RATE;
-                }
-                else if(pwm_val > MAXIMUM_RATE)
-                {
-                    pwm_val = MAXIMUM_RATE;
-                }
-                else
-                {
-                    // Do nothing
-                }
-                // Set pwm duty cycle
-                TA0CCR1 = pwm_val;
-                // Clean variables
-                input_data.data_count = 0;
-                memset(input_data.data_input, '\0', sizeof(input_data.data_input));
-            }
+            // Clean variables
+            input_data.data_count = 0;
+            memset(input_data.data_input, '\0', sizeof(input_data.data_input));
         }
     }
+    else
+    {
+        // Validate count and data
+        if((MAXIMUM_ARRAY_DATA >= input_data.data_count) && ('\0' != input_data.data_input[0]))
+        {
+            // Convert received data (duty cycle) in timer counts
+            pwm_val = (int)((atoi(input_data.data_input))*128)/100;
+            // Check limits
+            if(pwm_val < MINIMUM_RATE)
+            {
+                pwm_val = MINIMUM_RATE;
+            }
+            else if(pwm_val > MAXIMUM_RATE)
+            {
+                pwm_val = MAXIMUM_RATE;
+            }
+            else
+            {
+                // Do nothing
+            }
+            // Set pwm duty cycle
+            TA0CCR1 = pwm_val;
+            // Clean variables
+            input_data.data_count = 0;
+            memset(input_data.data_input, '\0', sizeof(input_data.data_input));
+        }
+    }
+}
